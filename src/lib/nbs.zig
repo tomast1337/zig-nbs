@@ -125,7 +125,7 @@ pub const Parser = struct {
         const version = header.version;
         const notes = try self.parseNotes(version);
         const layers = try self.parseLayers(header.song_layers, version);
-        const instruments = try self.parseInstruments(version);
+        const instruments = try self.parseInstruments();
 
         return File{
             .header = header,
@@ -137,13 +137,18 @@ pub const Parser = struct {
 
     fn readNumeric(self: *Parser, comptime T: type) !T {
         const size = @sizeOf(T);
-        const buffer = try self.file.reader().readBytesNoEof(size);
-        return mem.readInt(T, buffer[0..size], .little);
+        var buffer: [size]u8 = undefined;
+        try self.file.reader().readNoEof(&buffer);
+        return mem.readInt(T, &buffer, .little);
     }
 
     fn readString(self: *Parser) ![]const u8 {
-        const length = try self.readNumeric(u32);
-        const buffer = try self.file.reader().readBytesNoEof(length);
+        const length = try self.readNumeric(u32); // Read the length of the string
+        const buffer = try std.heap.page_allocator.alloc(u8, length); // Allocate memory for the string
+        errdefer std.heap.page_allocator.free(buffer); // Free memory if an error occurs
+
+        // Read the string data into the buffer
+        try self.file.reader().readNoEof(buffer);
         return buffer;
     }
 
@@ -201,7 +206,7 @@ pub const Parser = struct {
                 const instrument = try self.readNumeric(u8);
                 const key = try self.readNumeric(u8);
                 const velocity = if (version >= 4) try self.readNumeric(u8) else 100;
-                const panning = if (version >= 4) try self.readNumeric(u8) - 100 else 0;
+                const panning = if (version >= 4) try self.readNumeric(i8) - 100 else 0;
                 const pitch = if (version >= 4) try self.readNumeric(i16) else 0;
 
                 try notes.append(Note{
@@ -226,7 +231,7 @@ pub const Parser = struct {
             const name = try self.readString();
             const lock = if (version >= 4) try self.readNumeric(u8) == 1 else false;
             const volume = try self.readNumeric(u8);
-            const panning = if (version >= 2) try self.readNumeric(u8) - 100 else 0;
+            const panning = if (version >= 2) @as(i8, @intCast(try self.readNumeric(u8) - 100)) else 0;
 
             try layers.append(Layer{
                 .id = i,
@@ -272,17 +277,12 @@ pub const Writer = struct {
         try self.writeHeader(nbs_file, version);
         try self.writeNotes(nbs_file, version);
         try self.writeLayers(nbs_file, version);
-        try self.writeInstruments(nbs_file, version);
+        try self.writeInstruments(nbs_file);
     }
 
     fn encodeNumeric(self: *Writer, comptime T: type, value: T) !void {
         var buffer: [@sizeOf(T)]u8 = undefined;
-        mem.writeInt(
-            T,
-            buffer[0..@sizeOf(T)],
-            value,
-            .little,
-        );
+        mem.writeInt(T, &buffer, value, .little);
         try self.file.writer().writeAll(&buffer);
     }
 
