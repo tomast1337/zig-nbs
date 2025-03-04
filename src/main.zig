@@ -7,7 +7,7 @@ pub fn main() !void {
     const file = try fs.cwd().openFile("example.nbs", .{});
     defer file.close();
 
-    const parser = nbs.Parser.init(file);
+    var parser = nbs.Parser.init(file); // Make parser mutable
     const nbs_file = try parser.readFile();
 
     try nbs_file.save("output.nbs", nbs.CURRENT_NBS_VERSION);
