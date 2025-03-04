@@ -23,6 +23,7 @@ test "Test numeric encoding and decoding" {
 
 test "Parse an NBS file" {
     const allocator = std.testing.allocator;
+
     var file = try std.fs.cwd().openFile("test.nbs", .{});
     defer file.close();
 
