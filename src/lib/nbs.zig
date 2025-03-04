@@ -3,10 +3,10 @@ const fs = std.fs;
 const mem = std.mem;
 const sort = std.sort;
 
-const CURRENT_NBS_VERSION = 5;
+pub const CURRENT_NBS_VERSION = 5;
 
 // Define the structs
-const Instrument = struct {
+pub const Instrument = struct {
     id: u32,
     name: []const u8,
     file: []const u8,
@@ -14,7 +14,7 @@ const Instrument = struct {
     press_key: bool = true,
 };
 
-const Note = struct {
+pub const Note = struct {
     tick: u32,
     layer: u32,
     instrument: u32,
@@ -24,7 +24,7 @@ const Note = struct {
     pitch: i16 = 0,
 };
 
-const Layer = struct {
+pub const Layer = struct {
     id: u32,
     name: []const u8 = "",
     lock: bool = false,
@@ -32,7 +32,7 @@ const Layer = struct {
     panning: i8 = 0,
 };
 
-const Header = struct {
+pub const Header = struct {
     version: u32 = CURRENT_NBS_VERSION,
     default_instruments: u32 = 16,
     song_length: u32 = 0,
@@ -56,7 +56,7 @@ const Header = struct {
     loop_start: u32 = 0,
 };
 
-const File = struct {
+pub const File = struct {
     header: Header,
     notes: []Note,
     layers: []Layer,
@@ -83,7 +83,7 @@ const File = struct {
     }
 };
 
-const NoteIterator = struct {
+pub const NoteIterator = struct {
     notes: []const Note,
     index: usize = 0,
 
@@ -113,7 +113,7 @@ const NoteIterator = struct {
     }
 };
 
-const Parser = struct {
+pub const Parser = struct {
     file: fs.File,
 
     pub fn init(file: fs.File) Parser {
@@ -261,7 +261,7 @@ const Parser = struct {
     }
 };
 
-const Writer = struct {
+pub const Writer = struct {
     file: fs.File,
 
     pub fn init(file: fs.File) Writer {
