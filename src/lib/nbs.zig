@@ -138,7 +138,7 @@ pub const Parser = struct {
     fn readNumeric(self: *Parser, comptime T: type) !T {
         const size = @sizeOf(T);
         const buffer = try self.file.reader().readBytesNoEof(size);
-        return mem.readIntLittle(T, buffer[0..size]);
+        return mem.readInt(T, buffer[0..size], .little);
     }
 
     fn readString(self: *Parser) ![]const u8 {
@@ -277,7 +277,12 @@ pub const Writer = struct {
 
     fn encodeNumeric(self: *Writer, comptime T: type, value: T) !void {
         var buffer: [@sizeOf(T)]u8 = undefined;
-        mem.writeIntLittle(T, &buffer, value);
+        mem.writeInt(
+            T,
+            buffer[0..@sizeOf(T)],
+            value,
+            .little,
+        );
         try self.file.writer().writeAll(&buffer);
     }
 
