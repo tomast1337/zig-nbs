@@ -4,13 +4,8 @@ const nbs = @import("lib/nbs.zig");
 
 // Example usage
 pub fn main() !void {
-    const file = try fs.cwd().openFile("example.nbs", .{});
-    defer file.close();
-
-    var parser = nbs.Parser.init(file); // Make parser mutable
-    const nbs_file = try parser.readFile();
-
-    try nbs_file.save("output.nbs", nbs.CURRENT_NBS_VERSION);
+    std.io.getStdOut().write("Reading file...\n", .{});
+    defer std.io.getStdOut().write("Done.\n", .{});
 }
 
 test "simple test" {
