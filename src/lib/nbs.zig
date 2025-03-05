@@ -67,64 +67,17 @@ pub const NbsFile = struct {
         self.header.song_layers = @as(u16, self.layers.len);
     }
 
-    /// Saves the file by writing it out using Writer.
     pub fn save(self: *NbsFile, filename: []const u8, version: u8) !void {
         self.updateHeader(version);
         var fs = std.fs.cwd();
         var file = try fs.createFile(filename, .{});
         defer file.close();
-        var writer = Writer.init(&file);
-        try writer.encodeFile(self, version);
-    }
-
-    // Note: The Python version’s __iter__ groups notes into chords.
-    // A full equivalent iterator in Zig would likely be a separate function.
-};
-
-/// Reads an NBS file from disk.
-pub fn read(filename: []const u8) !NbsFile {
-    var fs = std.fs.cwd();
-    var file = try fs.openFile(filename, .{ .read = true });
-    defer file.close();
-
-    // Read entire file into memory. Adjust the allocator as needed.
-    var allocator = std.heap.page_allocator;
-    const buffer = try file.readToEndAlloc(allocator, 4096);
-    defer allocator.free(buffer);
-
-    var parser = Parser.init(buffer);
-    return try parser.readFile();
-}
-
-/// Creates a new NBS file with the given header and default empty content.
-pub fn newFile(header: Header) NbsFile {
-    return NbsFile{
-        .header = header,
-        .notes = &[_]Note{}, // empty slice
-        .layers = &[_]Layer{
-            Layer{
-                .id = 0,
-                .name = "",
-                .lock = false,
-                .volume = 100,
-                .panning = 0,
-            },
-        },
-        .instruments = &[_]Instrument{}, // empty slice
-    };
-}
-
-/// Parser for reading NBS file data.
-pub const Parser = struct {
-    data: []const u8,
-    offset: usize,
-
-    pub fn init(data: []const u8) Parser {
-        return Parser{ .data = data, .offset = 0 };
     }
 };
 
-/// Writer for encoding NBS file data.
-pub const Writer = struct {
-    file: *std.fs.File,
-};
+test "opens nbstest.nbs" {
+    const fileContents = @embedFile("./test-files/nyan_cat.nbs");
+    std.debug.print("Len: {d}", .{fileContents.len});
+    // print the first 512 bytes
+    std.debug.print("{s}", .{fileContents[0..512]});
+}
