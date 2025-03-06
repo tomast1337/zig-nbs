@@ -8,7 +8,7 @@ pub fn main() !void {
     const allocator = std.heap.page_allocator;
 
     // Open the file
-    const path = "nyan_cat.nbs";
+    const path = "./nyan_cat.nbs";
     const file = try fs.cwd().openFile(path, .{});
     defer file.close();
 
