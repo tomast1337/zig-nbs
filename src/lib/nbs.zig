@@ -104,6 +104,14 @@ pub const NbsFile = struct {
 
 pub const NBSParser = struct {
     file_data: []const u8,
+    current_data: []const u8,
+
+    pub fn init(file_data: []const u8) NBSParser {
+        return NBSParser{
+            .file_data = file_data,
+            .current_data = file_data,
+        };
+    }
 
     pub fn parse(self: *NBSParser) !NbsFile {
         const header = try self.parseHeader();
@@ -190,6 +198,8 @@ pub const NBSParser = struct {
         const loop_start: u16 = NBSParser.readU16(header_bytes);
         header_bytes = header_bytes[2..];
 
+        self.current_data = header_bytes;
+
         return Header{
             .version = version,
             .default_instruments = default_instruments,
@@ -274,7 +284,6 @@ pub const NBSParser = struct {
         // get one byte of data
         const version = self.file_data[0];
         std.debug.print("version: {d}\n", .{version});
-
         return instruments;
     }
 };
@@ -283,11 +292,34 @@ test "parses nyan_cat.nb" {
     const fileContents = @embedFile("./test-files/nyan_cat.nbs");
     std.debug.print("testing with nyan_cat.nbs length: {d} bytes\n", .{fileContents.len});
 
-    var parser = NBSParser{ .file_data = fileContents };
+    var parser = NBSParser.init(fileContents);
     const file = try parser.parse();
-    std.debug.print("Song Name: {s} Song Author: {s}\n", .{ file.header.song_name, file.header.song_author });
-    std.debug.print("Notes: {d}\n", .{file.notes.len});
-    std.debug.print("Notes: {d}\n", .{file.notes.len});
-    std.debug.print("Layers: {d}\n", .{file.layers.len});
-    std.debug.print("Instruments: {d}\n", .{file.instruments.len});
+
+    const version = 5;
+
+    try std.testing.expect(file.header.version == version);
+    try std.testing.expect(std.mem.eql(u8, file.header.song_name, "Nyan Cat"));
+    try std.testing.expect(std.mem.eql(u8, file.header.song_author, "chenxi050402"));
+    try std.testing.expect(std.mem.eql(u8, file.header.description, "\"Nyan Cat\" recreated in note blocks by chenxi050402."));
+    try std.testing.expect(std.mem.eql(u8, file.header.original_author, ""));
+    try std.testing.expect(std.mem.eql(u8, file.header.song_origin, ""));
+
+    try std.testing.expect(file.header.auto_save == false);
+    try std.testing.expect(file.header.loop == true);
+
+    try std.testing.expect(file.header.default_instruments == 16);
+    try std.testing.expect(file.header.auto_save_duration == 10);
+    try std.testing.expect(file.header.time_signature == 8);
+    try std.testing.expect(file.header.max_loop_count == 0);
+
+    try std.testing.expect(file.header.song_length == 670);
+    try std.testing.expect(file.header.song_layers == 36);
+    try std.testing.expect(file.header.tempo == 1893);
+    try std.testing.expect(file.header.loop_start == 160);
+
+    try std.testing.expect(file.header.minutes_spent == 32);
+    try std.testing.expect(file.header.left_clicks == 1207);
+    try std.testing.expect(file.header.right_clicks == 32);
+    try std.testing.expect(file.header.blocks_added == 212);
+    try std.testing.expect(file.header.blocks_removed == 27);
 }
