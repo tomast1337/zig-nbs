@@ -81,17 +81,17 @@ pub const Header = struct {
 
 pub const NbsFile = struct {
     header: Header,
-    notes: []Note,
-    layers: []Layer,
-    instruments: []Instrument,
+    notes: std.ArrayList(Note),
+    layers: std.ArrayList(Layer),
+    instruments: std.ArrayList(Instrument),
 
     /// Updates the header based on the notes and layers.
     pub fn updateHeader(self: *NbsFile, version: u8) void {
         self.header.version = version;
-        if (self.notes.len > 0) {
-            self.header.song_length = self.notes[self.notes.len - 1].tick;
+        if (self.notes.items.len > 0) {
+            self.header.song_length = self.notes.items[self.notes.items.len - 1].tick;
         }
-        self.header.song_layers = @as(u16, self.layers.len);
+        self.header.song_layers = @as(u16, self.layers.items.len);
     }
 
     pub fn save(self: *NbsFile, filename: []const u8, version: u8) !void {
@@ -99,6 +99,7 @@ pub const NbsFile = struct {
         var fs = std.fs.cwd();
         var file = try fs.createFile(filename, .{});
         defer file.close();
+        // TODO: Implement file writing logic
     }
 };
 
@@ -113,11 +114,11 @@ pub const NBSParser = struct {
         };
     }
 
-    pub fn parse(self: *NBSParser) !NbsFile {
+    pub fn parse(self: *NBSParser, allocator: std.mem.Allocator) !NbsFile {
         const header = try self.parseHeader();
-        const notes = try self.parseNotes();
-        const layers = try self.parseLayers();
-        const instruments = try self.parseInstruments();
+        const notes = try self.parseNotes(allocator);
+        const layers = try self.parseLayers(allocator);
+        const instruments = try self.parseInstruments(allocator);
         const file = NbsFile{
             .header = header,
             .notes = notes,
@@ -129,6 +130,10 @@ pub const NBSParser = struct {
 
     fn readU16(bytes: []const u8) u16 {
         return bytes[0] | (@as(u16, bytes[1]) << 8);
+    }
+
+    fn readI16(bytes: []const u8) i16 {
+        return bytes[0] | (@as(i16, bytes[1]) << 8);
     }
 
     fn readU32(bytes: []const u8) u32 {
@@ -225,76 +230,101 @@ pub const NBSParser = struct {
         };
     }
 
-    fn parseNotes(self: *NBSParser) ![]Note {
-        const notes: []Note = blk: {
-            var initial_notes: [10]Note = undefined;
-            for (&initial_notes, 0..) |*note, i| {
-                note.* = Note{
-                    .tick = @intCast(i),
-                    .layer = @intCast(i),
-                    .instrument = 1,
-                    .key = 60,
-                };
-            }
-            break :blk initial_notes[0..];
-        };
+    fn parseNotes(self: *NBSParser, allocator: std.mem.Allocator) !std.ArrayList(Note) {
+        var notes = std.ArrayList(Note).init(allocator);
+        var current_tick: u16 = 0;
 
-        // get one byte of data
-        const version = self.file_data[0];
-        std.debug.print("version: {d}\n", .{version});
+        while (true) {
+            const jump_ticks = NBSParser.readU16(self.current_data);
+            self.current_data = self.current_data[2..];
+            if (jump_ticks == 0) break;
+
+            current_tick += jump_ticks;
+
+            while (true) {
+                const jump_layers = NBSParser.readU16(self.current_data);
+                self.current_data = self.current_data[2..];
+                if (jump_layers == 0) break;
+
+                const instrument = self.current_data[0];
+                self.current_data = self.current_data[1..];
+                const key = self.current_data[0];
+                self.current_data = self.current_data[1..];
+
+                const velocity = self.current_data[0];
+                self.current_data = self.current_data[1..];
+                const panning = @as(i8, @bitCast(self.current_data[0])) - 100;
+                self.current_data = self.current_data[1..];
+                const pitch = NBSParser.readI16(self.current_data);
+                self.current_data = self.current_data[2..];
+
+                try notes.append(Note{
+                    .tick = current_tick,
+                    .layer = jump_layers,
+                    .instrument = instrument,
+                    .key = key,
+                    .velocity = velocity,
+                    .panning = panning,
+                    .pitch = pitch,
+                });
+            }
+        }
 
         return notes;
     }
 
-    fn parseLayers(self: *NBSParser) ![]Layer {
-        const layers: []Layer = blk: {
-            var initial_layers: [10]Layer = undefined;
-            for (&initial_layers, 0..) |*layer, i| {
-                layer.* = Layer{
-                    .id = @intCast(i),
-                    .name = "Layer",
-                    .lock = false,
-                    .volume = 100,
-                    .panning = 0,
-                };
-            }
-            break :blk initial_layers[0..];
-        };
+    fn parseLayers(self: *NBSParser, allocator: std.mem.Allocator) !std.ArrayList(Layer) {
+        var layers = std.ArrayList(Layer).init(allocator);
+        var layer_id: u16 = 0;
 
-        // get one byte of data
-        const version = self.file_data[0];
-        std.debug.print("version: {d}\n", .{version});
+        while (true) {
+            const name = try NBSParser.readString(&self.current_data);
+            if (name.len == 0) break;
+
+            const lock = self.current_data[0] != 0;
+            self.current_data = self.current_data[1..];
+            const volume = self.current_data[0];
+            self.current_data = self.current_data[1..];
+            const panning = @as(i8, @bitCast(self.current_data[0])) - 100;
+            self.current_data = self.current_data[1..];
+
+            try layers.append(Layer{
+                .id = layer_id,
+                .name = name,
+                .lock = lock,
+                .volume = volume,
+                .panning = panning,
+            });
+
+            layer_id += 1;
+        }
 
         return layers;
     }
 
-    fn parseInstruments(self: *NBSParser) ![]Instrument {
-        const instruments: []Instrument = blk: {
-            var initial_instruments: [10]Instrument = undefined;
-            for (&initial_instruments, 0..) |*instrument, i| {
-                instrument.* = Instrument{
-                    .id = @intCast(i),
-                    .name = "Instrument",
-                    .file = "file",
-                };
-            }
-            break :blk initial_instruments[0..];
-        };
-
+    fn parseInstruments(self: *NBSParser, allocator: std.mem.Allocator) !std.ArrayList(Instrument) {
         // get one byte of data
         const version = self.file_data[0];
         std.debug.print("version: {d}\n", .{version});
-        return instruments;
+
+        const instrument_list = std.ArrayList(Instrument).init(allocator);
+        return instrument_list;
     }
 };
 
 test "parses nyan_cat.nb" {
+    const allocator = std.testing.allocator;
+
     const fileContents = @embedFile("./test-files/nyan_cat.nbs");
     std.debug.print("testing with nyan_cat.nbs length: {d} bytes\n", .{fileContents.len});
 
     var parser = NBSParser.init(fileContents);
-    const file = try parser.parse();
-
+    const file = try parser.parse(allocator);
+    defer {
+        file.notes.deinit();
+        file.layers.deinit();
+        file.instruments.deinit();
+    }
     const version = 5;
 
     try std.testing.expect(file.header.version == version);
