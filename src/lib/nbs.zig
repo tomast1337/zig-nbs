@@ -325,9 +325,7 @@ test "parses nyan_cat.nbs" {
     var file = try parser.parse(allocator);
     defer file.deinit();
 
-    const version = 5;
-
-    try std.testing.expect(file.header.version == version);
+    try std.testing.expect(file.header.version == 5);
     try std.testing.expect(std.mem.eql(u8, file.header.song_name, "Nyan Cat"));
     try std.testing.expect(std.mem.eql(u8, file.header.song_author, "chenxi050402"));
     try std.testing.expect(std.mem.eql(u8, file.header.description, "\"Nyan Cat\" recreated in note blocks by chenxi050402."));
