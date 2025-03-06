@@ -312,7 +312,7 @@ pub const NBSParser = struct {
     }
 };
 
-test "parses nyan_cat.nb" {
+test "parses nyan_cat.nbs" {
     const allocator = std.testing.allocator;
 
     const fileContents = @embedFile("./test-files/nyan_cat.nbs");
@@ -352,4 +352,9 @@ test "parses nyan_cat.nb" {
     try std.testing.expect(file.header.right_clicks == 32);
     try std.testing.expect(file.header.blocks_added == 212);
     try std.testing.expect(file.header.blocks_removed == 27);
+
+    // iterate over notes and print them
+    for (file.notes.items) |note| {
+        std.debug.print("note: {d} {d} {d} {d} {d} {d} {d}\n", .{ note.tick, note.layer, note.instrument, note.key, note.velocity, note.panning, note.pitch });
+    }
 }
