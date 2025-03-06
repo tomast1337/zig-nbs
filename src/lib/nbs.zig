@@ -85,6 +85,12 @@ pub const NbsFile = struct {
     layers: std.ArrayList(Layer),
     instruments: std.ArrayList(Instrument),
 
+    pub fn deinit(self: *NbsFile) void {
+        self.notes.deinit();
+        self.layers.deinit();
+        self.instruments.deinit();
+    }
+
     /// Updates the header based on the notes and layers.
     pub fn updateHeader(self: *NbsFile, version: u8) void {
         self.header.version = version;
@@ -303,10 +309,7 @@ pub const NBSParser = struct {
     }
 
     fn parseInstruments(self: *NBSParser, allocator: std.mem.Allocator) !std.ArrayList(Instrument) {
-        // get one byte of data
-        const version = self.file_data[0];
-        std.debug.print("version: {d}\n", .{version});
-
+        self.current_data = self.current_data;
         const instrument_list = std.ArrayList(Instrument).init(allocator);
         return instrument_list;
     }
@@ -319,12 +322,9 @@ test "parses nyan_cat.nbs" {
     std.debug.print("testing with nyan_cat.nbs length: {d} bytes\n", .{fileContents.len});
 
     var parser = NBSParser.init(fileContents);
-    const file = try parser.parse(allocator);
-    defer {
-        file.notes.deinit();
-        file.layers.deinit();
-        file.instruments.deinit();
-    }
+    var file = try parser.parse(allocator);
+    defer file.deinit();
+
     const version = 5;
 
     try std.testing.expect(file.header.version == version);
